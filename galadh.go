@@ -75,7 +75,7 @@ func (g Galadh) PrintTree(path string) error {
 
 func (g *Galadh) printDir(path string, lvl int) {
 
-	_ := g.getFiles(fi)
+	_, _ = g.getFiles(path)
 }
 
 func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
@@ -94,18 +94,46 @@ func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 	}
 
 	fs, err := file.Readdir(0)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
 	// Todo: implement
 	for _, f := range fs {
-		fullPath := filepath.Join(path, f.Name())
-		if !g.allFiles && isHidden()
+		// If option all files is not set
+		// and it is a hidden file, we skip the file.
+		if !g.allFiles && isHidden(f) {
+			continue
+		}
+
+		// If only dir option is set and we have
+		// a file, we skip it.
+		if g.dirOnly && !f.IsDir() {
+			continue
+		}
+
+		// If an include pattern is set, check
+		// if file matches the pattern and return
+		// if not match.
+		if !g.matchFilePattern(g.includePattern, f.Name(), path) {
+			continue
+		}
 
 	}
 
 	return files, nil
+}
+
+func (g Galadh) matchFilePattern(pattern, name, path string) bool {
+	if pattern == "" {
+		return true
+	}
+
+	fname := name
+	if g.matchDirs {
+		fname = filepath.
+	}
+
 }
 
 type treePrinter struct {
