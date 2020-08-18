@@ -74,7 +74,7 @@ func (g Galadh) PrintTree(path string) error {
 }
 
 func (g *Galadh) printDir(path string, lvl int) {
-
+	// ToDo: Implement
 	_, _ = g.getFiles(path)
 }
 
@@ -98,7 +98,14 @@ func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 		return nil, err
 	}
 
-	// Todo: implement
+	// If we use the match dir options, check
+	// if folder name matches and set var.
+	dirPatternMatch := false
+	if g.matchDirs {
+		dirPatternMatch = g.matchPattern(g.includePattern, fi.Name())
+	}
+
+	// Processing files of this directory
 	for _, f := range fs {
 		// If option all files is not set
 		// and it is a hidden file, we skip the file.
@@ -113,27 +120,34 @@ func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 		}
 
 		// If an include pattern is set, check
-		// if file matches the pattern and return
-		// if not match.
-		if !g.matchFilePattern(g.includePattern, f.Name(), path) {
+		// if file matches the pattern and continue
+		// if not. If dir pattern matches include all files.
+		if !(dirPatternMatch || g.matchPattern(g.includePattern, f.Name())) {
 			continue
 		}
 
+		// Skip file if exclude pattern matches
+		if g.matchPattern(g.excludePattern, f.Name()) {
+			continue
+		}
+
+		files = append(files, f)
 	}
 
 	return files, nil
 }
 
-func (g Galadh) matchFilePattern(pattern, name, path string) bool {
+func (g Galadh) matchPattern(pattern, name string) bool {
 	if pattern == "" {
 		return true
 	}
 
-	fname := name
-	if g.matchDirs {
-		fname = filepath.
+	match, err := filepath.Match(pattern, name)
+	if err != nil {
+		return false
 	}
 
+	return match
 }
 
 type treePrinter struct {
