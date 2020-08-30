@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-sharp/color"
 )
 
 type glyphSet struct {
@@ -15,8 +17,14 @@ type glyphSet struct {
 }
 
 var (
+	// Glyphsets
 	asciiGlyphSet   = glyphSet{pipe: "|", last: "`--", item: "|--"}
 	unicodeGlyphSet = glyphSet{pipe: "│", last: "└──", item: "├──"}
+
+	// Color functions
+	errColor = color.New(color.FgRed).SprintFunc()
+	dirColor = color.New(color.FgBlue).SprintFunc()
+	binColor = color.New(color.FgMagenta).SprintFunc()
 )
 
 // Galadh is simple clone of the posix tree command.
@@ -42,7 +50,8 @@ type Galadh struct {
 	cntFiles int
 	cntDirs  int
 
-	printer treePrinter
+	glyphs  glyphSet
+	indents []string
 	w       io.Writer
 }
 
@@ -74,8 +83,11 @@ func (g Galadh) PrintTree(path string) error {
 }
 
 func (g *Galadh) printDir(path string, lvl int) {
-	// ToDo: Implement
-	_, _ = g.getFiles(path)
+	// Fetch content of directory
+	// files, err = g.getFiles(path)
+	// if err != nil {
+	// 	g.printer.printItem()
+	// }
 }
 
 func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
@@ -150,6 +162,21 @@ func (g Galadh) matchPattern(pattern, name string) bool {
 	return match
 }
 
+func (g *Galadh) indent(lastItem bool) {
+	if lastItem {
+		g.indents = append(g.indents, strings.Repeat(" ", 5))
+		return
+	}
+
+	g.indents = append(g.indents, g.glyphs.pipe+strings.Repeat(" ", 4))
+}
+
+func (g *Galadh) unindent() {
+	if len(g.indents) > 0 {
+		g.indents = g.indents[:len(g.indents)-1]
+	}
+}
+
 type treePrinter struct {
 	glyphs   glyphSet
 	indents  []string
@@ -172,12 +199,12 @@ func (t *treePrinter) unindent() {
 	}
 }
 
-func (t *treePrinter) printItem(label string, last bool) {
+func (t *treePrinter) printItem(typ itemTyp, label string) {
 	for i := range t.indents {
 		fmt.Fprint(t.w, t.indents[i])
 	}
 
-	if last {
+	if typ&lastItem == lastItem {
 		fmt.Fprint(t.w, t.glyphs.last)
 		t.lastItem = true
 	} else {
@@ -185,7 +212,10 @@ func (t *treePrinter) printItem(label string, last bool) {
 		t.lastItem = false
 	}
 
-	fmt.Fprintln(t.w, " ", label)
+	if typ&errorItem == errorItem {
+
+	}
+
 }
 
 func PrintTest() {
