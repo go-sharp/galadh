@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/go-sharp/color"
 )
@@ -59,10 +60,9 @@ type Galadh struct {
 	cntFiles int
 	cntDirs  int
 
-	metaLength int
-	glyphs     glyphSet
-	indents    []string
-	w          io.Writer
+	glyphs  glyphSet
+	indents []string
+	w       io.Writer
 }
 
 // PrintTree prints a tree according the configured options for
@@ -198,9 +198,29 @@ func (g Galadh) printItem(path string, file os.FileInfo, lastItem bool) {
 		fmt.Fprint(g.w, g.glyphs.item)
 	}
 
-	// Todo: Implement print logic
-	///label := g.getFileLabel(path, file)
+	// First print the metadata
+	fmt.Fprintf(g.w, " %v", g.getMetaData(path, file))
 
+	label := file.Name()
+	if g.printFullPath {
+		label = filepath.Join(path, label)
+	}
+
+	// Replace non-printable characters if requested
+	if g.replaceNonPrintable {
+		label = replaceNonPrintable(label)
+	}
+
+	// Use color function according file type
+	if file.IsDir() {
+		fmt.Fprintln(g.w, dirColor(label))
+	} else if isHidden(file) {
+		fmt.Fprintln(g.w, hiddenColor(label))
+	} else if isExecutable(file) {
+		fmt.Fprintln(g.w, binColor(label))
+	} else {
+		fmt.Fprintln(g.w, label)
+	}
 }
 
 func (g Galadh) getMetaData(path string, file os.FileInfo) string {
@@ -249,4 +269,17 @@ func fillPrefix(n int, str string) string {
 	}
 
 	return fmt.Sprintf("%v%v", strings.Repeat(" ", n-cnt), str)
+}
+
+func replaceNonPrintable(str string) string {
+	runes := make([]rune, 0, len(str))
+	for _, r := range str {
+		if !unicode.IsPrint(r) {
+			runes = append(runes, '?')
+			continue
+		}
+		runes = append(runes, r)
+	}
+
+	return string(runes)
 }

@@ -2,6 +2,8 @@ package galadh
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -12,4 +14,8 @@ func isHidden(fi os.FileInfo) bool {
 	}
 
 	return data.FileAttributes&syscall.FILE_ATTRIBUTE_HIDDEN == FILE_ATTRIBUTE_HIDDEN
+}
+
+func isExecutable(fi os.FileInfo) bool {
+	return strings.EqualFold(filepath.Ext(fi.Name()), "exe")
 }
