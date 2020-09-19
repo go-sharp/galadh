@@ -16,15 +16,24 @@ type glyphSet struct {
 	item string
 }
 
+const (
+	kbSize = 1 << 10
+	mbSize = 1 << 20
+	gbSize = 1 << 30
+	tbSize = 1 << 40
+	pbSize = 1 << 50
+)
+
 var (
 	// Glyphsets
 	asciiGlyphSet   = glyphSet{pipe: "|", last: "`--", item: "|--"}
 	unicodeGlyphSet = glyphSet{pipe: "│", last: "└──", item: "├──"}
 
 	// Color functions
-	errColor = color.New(color.FgRed).SprintFunc()
-	dirColor = color.New(color.FgBlue).SprintFunc()
-	binColor = color.New(color.FgMagenta).SprintFunc()
+	errColor    = color.New(color.FgRed).SprintFunc()
+	dirColor    = color.New(color.FgBlue).SprintFunc()
+	binColor    = color.New(color.FgMagenta).SprintFunc()
+	hiddenColor = color.New(color.FgHiCyan).SprintFunc()
 )
 
 // Galadh is simple clone of the posix tree command.
@@ -50,9 +59,10 @@ type Galadh struct {
 	cntFiles int
 	cntDirs  int
 
-	glyphs  glyphSet
-	indents []string
-	w       io.Writer
+	metaLength int
+	glyphs     glyphSet
+	indents    []string
+	w          io.Writer
 }
 
 // PrintTree prints a tree according the configured options for
@@ -177,64 +187,66 @@ func (g *Galadh) unindent() {
 	}
 }
 
-type treePrinter struct {
-	glyphs   glyphSet
-	indents  []string
-	lastItem bool
-	w        io.Writer
-}
-
-func (t *treePrinter) indent() {
-	if t.lastItem {
-		t.indents = append(t.indents, strings.Repeat(" ", 5))
-		return
+func (g Galadh) printItem(path string, file os.FileInfo, lastItem bool) {
+	for i := range g.indents {
+		fmt.Fprint(g.w, g.indents[i])
 	}
 
-	t.indents = append(t.indents, t.glyphs.pipe+strings.Repeat(" ", 4))
-}
-
-func (t *treePrinter) unindent() {
-	if len(t.indents) > 0 {
-		t.indents = t.indents[:len(t.indents)-1]
-	}
-}
-
-func (t *treePrinter) printItem(typ itemTyp, label string) {
-	for i := range t.indents {
-		fmt.Fprint(t.w, t.indents[i])
-	}
-
-	if typ&lastItem == lastItem {
-		fmt.Fprint(t.w, t.glyphs.last)
-		t.lastItem = true
+	if lastItem {
+		fmt.Fprint(g.w, g.glyphs.last)
 	} else {
-		fmt.Fprint(t.w, t.glyphs.item)
-		t.lastItem = false
+		fmt.Fprint(g.w, g.glyphs.item)
 	}
 
-	if typ&errorItem == errorItem {
-
-	}
+	// Todo: Implement print logic
+	///label := g.getFileLabel(path, file)
 
 }
 
-func PrintTest() {
-	printer := treePrinter{glyphs: unicodeGlyphSet, w: os.Stdout}
-	printer.printItem("Hello", false)
-	printer.printItem("World", false)
-	printer.indent()
-	printer.printItem("LotR", false)
-	printer.indent()
-	printer.printItem("Legolas", false)
-	printer.printItem("Gandalf", false)
-	printer.printItem("Frodo", true)
-	printer.unindent()
-	printer.printItem("Swtor", true)
-	printer.indent()
-	printer.printItem("Han", false)
-	printer.printItem("Solo", false)
-	printer.printItem("Leia", true)
-	printer.unindent()
-	printer.unindent()
-	printer.printItem("Bye", true)
+func (g Galadh) getMetaData(path string, file os.FileInfo) string {
+	var meta []string
+	if g.printSize {
+		var size string
+		if g.humanReadable {
+			switch sz := file.Size(); {
+			case sz < kbSize:
+				size = fmt.Sprintf("%v", sz)
+			case sz < mbSize:
+				size = fmt.Sprintf("%.2fKb", float64(sz)/kbSize)
+			case sz < gbSize:
+				size = fmt.Sprintf("%.2fMb", float64(sz)/mbSize)
+			case sz < tbSize:
+				size = fmt.Sprintf("%.2fGb", float64(sz)/gbSize)
+			case sz < pbSize:
+				size = fmt.Sprintf("%.2fTb", float64(sz)/tbSize)
+			default:
+				size = fmt.Sprintf("%.2fPb", float64(sz)/pbSize)
+			}
+			size = fillPrefix(9, size)
+
+		} else {
+			size = fmt.Sprintf("%v", file.Size())
+			// Use only 14 digits, otherwise show in scientific notation
+			if len(size) > 14 {
+				size = fmt.Sprintf("%E", float64(file.Size()))
+			}
+			size = fillPrefix(14, size)
+		}
+		meta = append(meta, size)
+	}
+
+	if len(meta) > 0 {
+		return "[" + strings.Join(meta, " ") + "] "
+	}
+
+	return ""
+}
+
+func fillPrefix(n int, str string) string {
+	cnt := len([]rune(str))
+	if cnt >= n {
+		return str
+	}
+
+	return fmt.Sprintf("%v%v", strings.Repeat(" ", n-cnt), str)
 }
