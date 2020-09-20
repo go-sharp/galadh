@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -36,6 +37,16 @@ var (
 	binColor    = color.New(color.FgMagenta).SprintFunc()
 	hiddenColor = color.New(color.FgHiCyan).SprintFunc()
 )
+
+// NewGaladh returns a new Galadh tree viewer.
+func NewGaladh() Galadh {
+	return Galadh{
+		w:         os.Stdout,
+		level:     -1,
+		useColors: true,
+		glyphs:    unicodeGlyphSet,
+	}
+}
 
 // Galadh is simple clone of the posix tree command.
 type Galadh struct {
@@ -87,19 +98,54 @@ func (g Galadh) PrintTree(path string) error {
 
 	g.cntDirs, g.cntFiles = 0, 0
 
-	fmt.Fprintln(g.w, path)
-	g.printDir(path, g.level)
+	fmt.Fprintln(g.w, dirColor(path))
+	g.printDir(path, 0)
+
+	// Print statistics
+	dirLabel := "directories"
+	fileLabel := "files"
+	if g.cntDirs == 1 {
+		dirLabel = "directory"
+	}
+	if g.cntFiles == 1 {
+		fileLabel = "file"
+	}
+	fmt.Fprintln(g.w, "\n", g.cntDirs, dirLabel, ",", g.cntFiles, fileLabel)
+
 	return nil
 }
 
 func (g *Galadh) printDir(path string, lvl int) {
 	// Fetch content of directory
-	// files, err = g.getFiles(path)
-	// if err != nil {
-	// 	g.printer.printItem()
-	// }
+	files, err := g.getFiles(path)
+	if err != nil {
+		g.printError(err.Error())
+		return
+	}
+
+	// For the moment do not handle symlinks and hardlinks
+	// differently, but in a future version it should be
+	// configurable how to handle links.
+	lastItem := len(files) - 1
+	for i := range files {
+		f := files[i]
+		g.printItem(path, f, i == lastItem)
+		// Recursively descending into a directory
+		if f.IsDir() {
+			g.cntDirs++
+			if g.level == -1 || lvl < g.level {
+				g.indent(i == lastItem)
+				g.printDir(filepath.Join(path, f.Name()), lvl+1)
+				g.unindent()
+			}
+		} else {
+			g.cntFiles++
+		}
+	}
 }
 
+// getFiles gets the content of a directory and applies all
+// configured filters.
 func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -149,12 +195,28 @@ func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 		}
 
 		// Skip file if exclude pattern matches
-		if g.matchPattern(g.excludePattern, f.Name()) {
+		if g.excludePattern != "" && g.matchPattern(g.excludePattern, f.Name()) {
 			continue
 		}
 
 		files = append(files, f)
 	}
+
+	// Let's sort our files slice, first directories and then files in alphabetic order.
+	sort.SliceStable(files, func(i, j int) bool {
+		fa := files[i]
+		fb := files[j]
+
+		if fa.IsDir() && !fb.IsDir() {
+			return true
+		}
+
+		if !fa.IsDir() && fb.IsDir() {
+			return false
+		}
+
+		return strings.ToLower(fa.Name()) < strings.ToLower(fb.Name())
+	})
 
 	return files, nil
 }
@@ -162,6 +224,11 @@ func (g Galadh) getFiles(path string) (files []os.FileInfo, err error) {
 func (g Galadh) matchPattern(pattern, name string) bool {
 	if pattern == "" {
 		return true
+	}
+
+	if g.ignoreCase {
+		pattern = strings.ToLower(pattern)
+		name = strings.ToLower(name)
 	}
 
 	match, err := filepath.Match(pattern, name)
@@ -185,6 +252,14 @@ func (g *Galadh) unindent() {
 	if len(g.indents) > 0 {
 		g.indents = g.indents[:len(g.indents)-1]
 	}
+}
+
+func (g Galadh) printError(str string) {
+	for i := range g.indents {
+		fmt.Fprint(g.w, g.indents[i])
+	}
+
+	fmt.Fprintln(g.w, errColor(str))
 }
 
 func (g Galadh) printItem(path string, file os.FileInfo, lastItem bool) {
@@ -246,11 +321,11 @@ func (g Galadh) getMetaData(path string, file os.FileInfo) string {
 
 		} else {
 			size = fmt.Sprintf("%v", file.Size())
-			// Use only 14 digits, otherwise show in scientific notation
-			if len(size) > 14 {
+			// Use only 11 digits, otherwise show in scientific notation
+			if len(size) > 11 {
 				size = fmt.Sprintf("%E", float64(file.Size()))
 			}
-			size = fillPrefix(14, size)
+			size = fillPrefix(11, size)
 		}
 		meta = append(meta, size)
 	}
