@@ -13,7 +13,7 @@ func isHidden(fi os.FileInfo) bool {
 		return false
 	}
 
-	return data.FileAttributes&syscall.FILE_ATTRIBUTE_HIDDEN == FILE_ATTRIBUTE_HIDDEN
+	return data.FileAttributes&syscall.FILE_ATTRIBUTE_HIDDEN == syscall.FILE_ATTRIBUTE_HIDDEN
 }
 
 func isExecutable(fi os.FileInfo) bool {

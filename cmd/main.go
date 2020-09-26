@@ -8,6 +8,10 @@ import (
 	flag "github.com/jessevdk/go-flags"
 )
 
+// Version
+var gitCommit string
+var gitTag string
+
 var options cmdOptions
 var parser = flag.NewParser(&options, flag.HelpFlag|flag.PassDoubleDash)
 
@@ -15,7 +19,7 @@ func main() {
 	_, err := parser.Parse()
 	if err != nil {
 		if e, ok := err.(*flag.Error); ok && e.Type == flag.ErrHelp {
-			fmt.Printf("galadh \u00A9 go-sharp authors\n")
+			fmt.Printf("galadh \u00A9 go-sharp\ncommit : %v\nversion: %v\n\n", gitCommit, gitTag)
 			fmt.Println(err)
 		} else {
 			fmt.Println("Galadh: failed to parse arguments:", err)
