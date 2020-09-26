@@ -39,13 +39,20 @@ var (
 )
 
 // NewGaladh returns a new Galadh tree viewer.
-func NewGaladh() Galadh {
-	return Galadh{
-		w:         os.Stdout,
-		level:     -1,
-		useColors: true,
-		glyphs:    unicodeGlyphSet,
+// It takes arbitrary options, but doesn't need any.
+func NewGaladh(options ...Options) *Galadh {
+	galadh := &Galadh{
+		w:      os.Stdout,
+		level:  -1,
+		glyphs: unicodeGlyphSet,
 	}
+
+	// Applying all passed options
+	for _, fn := range options {
+		fn(galadh)
+	}
+
+	return galadh
 }
 
 // Galadh is simple clone of the posix tree command.
@@ -59,14 +66,12 @@ type Galadh struct {
 	level          int
 	matchDirs      bool
 	printFullPath  bool
-	// File optionsShowTree
+	// File Options
 	humanReadable       bool
 	printSize           bool
 	replaceNonPrintable bool
-	outputFile          bool
-	// Graphic options
-	useASCII  bool
-	useColors bool
+	disableColor        bool
+
 	// Reporting
 	cntFiles int
 	cntDirs  int
@@ -110,7 +115,7 @@ func (g Galadh) PrintTree(path string) error {
 	if g.cntFiles == 1 {
 		fileLabel = "file"
 	}
-	fmt.Fprintln(g.w, "\n", g.cntDirs, dirLabel, ",", g.cntFiles, fileLabel)
+	fmt.Fprintf(g.w, "\n %v %v, %v %v\n", g.cntDirs, dirLabel, g.cntFiles, fileLabel)
 
 	return nil
 }
@@ -241,11 +246,11 @@ func (g Galadh) matchPattern(pattern, name string) bool {
 
 func (g *Galadh) indent(lastItem bool) {
 	if lastItem {
-		g.indents = append(g.indents, strings.Repeat(" ", 5))
+		g.indents = append(g.indents, strings.Repeat(" ", 4))
 		return
 	}
 
-	g.indents = append(g.indents, g.glyphs.pipe+strings.Repeat(" ", 4))
+	g.indents = append(g.indents, g.glyphs.pipe+strings.Repeat(" ", 3))
 }
 
 func (g *Galadh) unindent() {
@@ -300,7 +305,7 @@ func (g Galadh) printItem(path string, file os.FileInfo, lastItem bool) {
 
 func (g Galadh) getMetaData(path string, file os.FileInfo) string {
 	var meta []string
-	if g.printSize {
+	if g.printSize || g.humanReadable {
 		var size string
 		if g.humanReadable {
 			switch sz := file.Size(); {
