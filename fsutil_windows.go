@@ -17,5 +17,5 @@ func isHidden(fi os.FileInfo) bool {
 }
 
 func isExecutable(fi os.FileInfo) bool {
-	return strings.EqualFold(filepath.Ext(fi.Name()), "exe")
+	return strings.EqualFold(filepath.Ext(fi.Name()), ".exe")
 }
